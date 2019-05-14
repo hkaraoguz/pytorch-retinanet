@@ -6,6 +6,7 @@ import copy
 import pdb
 import time
 import argparse
+import json
 
 import sys
 import cv2
@@ -60,7 +61,64 @@ def resize_image(image, min_side=608, max_side=1024):
     new_image = np.zeros((rows + pad_w, cols + pad_h, cns)).astype(np.float32)
     new_image[:rows, :cols, :] = image.astype(np.float32)
 
-    return new_image
+    return new_image, pad_w, pad_h
+
+
+def inference(cvimg, conf_thresh=0.5):
+    '''
+    inference runs on an opencv image and returns the results in a json format
+    '''
+    results_dict = {}
+    # cvimg = cv2.imread("data/val/shelves4.jpg",-1)
+    try:
+        retinanet = torch.load("csv_retinanet_1200.pt")
+        retinanet = retinanet.cuda()
+        retinanet.eval()
+        # Transform image into right format
+        rgbcvimg = cv2.cvtColor(cvimg, cv2.COLOR_BGR2RGB)
+        ncvimg = normalize_image(rgbcvimg.astype(np.float32)/255.0)
+        rncvimg, pad_w, pad_h = resize_image(ncvimg)
+        print("pad_w {} pad_h {}".format(pad_w, pad_h))
+        #print(rncvimg.shape)
+        img = torch.from_numpy(rncvimg).cuda().float()
+        img = img[np.newaxis, :] 
+        #print(img.shape)
+        img = img.permute(0, 3, 1, 2)
+
+        with torch.no_grad():
+            st = time.time()
+            scores, classification, transformed_anchors = retinanet(img)
+            print('Elapsed time: {}'.format(time.time()-st))
+            idxs = np.where(scores > conf_thresh)
+            srcimg = cvimg.copy() 
+
+            dim = (rncvimg.shape[1]-pad_w, rncvimg.shape[0]-pad_h)
+            # resize image
+            resized = cv2.resize(srcimg, dim, interpolation=cv2.INTER_AREA)
+            
+            bboxes = []
+            for j in range(idxs[0].shape[0]):
+                bbox = transformed_anchors[idxs[0][j], :]
+                x1 = int(bbox[0])
+                y1 = int(bbox[1])
+                x2 = int(bbox[2])
+                y2 = int(bbox[3])
+                label_name = dataset_val.labels[int(classification[idxs[0][j]])]
+                draw_caption(resized, (x1, y1, x2, y2), label_name)
+
+                cv2.rectangle(resized, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
+                bboxes.append([x1, y1, x2, y2, label_name, scores[j].item()])
+                #print(label_name)
+            results_dict["status"] = "Success"
+            results_dict["result"] = bboxes
+    except Exception as ex:
+        print(ex)
+        results_dict["status"] = "Fail. {}".format(str(ex))
+        results_dict["results"] = []
+    
+    torch.cuda.empty_cache()
+    
+    return json.dumps(results_dict)
 
 
 def main(args=None):
@@ -106,13 +164,13 @@ def main(args=None):
     cvimg = cv2.imread("data/val/shelves4.jpg",-1)
     rgbcvimg = cv2.cvtColor(cvimg, cv2.COLOR_BGR2RGB)
     ncvimg = normalize_image(rgbcvimg.astype(np.float32)/255.0)
-    rncvimg = resize_image(ncvimg)
+    rncvimg,pad_w,pad_h = resize_image(ncvimg)
+    print("pad_w {} pad_h {}".format(pad_w,pad_h))
     print(rncvimg.shape)
     img = torch.from_numpy(rncvimg).cuda().float()
     img = img[np.newaxis, :] 
     #print(img.shape)
     img = img.permute(0, 3, 1, 2)
-
 
     with torch.no_grad():
         st = time.time()
@@ -121,13 +179,13 @@ def main(args=None):
         idxs = np.where(scores > 0.5)
         img = cvimg.copy() #np.array(255 * unnormalize(data['img'][0, :, :, :])).copy()
 
-        dim = (rncvimg.shape[1]-32, rncvimg.shape[0]-32)
+        dim = (rncvimg.shape[1]-pad_w, rncvimg.shape[0]-pad_h)
         # resize image
         resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
 
 
-        img[img < 0] = 0
-        img[img > 255] = 255
+        #img[img < 0] = 0
+        #img[img > 255] = 255
 
        # img = np.transpose(img, (1, 2, 0))
 
@@ -143,6 +201,7 @@ def main(args=None):
             draw_caption(resized, (x1, y1, x2, y2), label_name)
 
             cv2.rectangle(resized, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
+            print(scores[j].item())
             #print(label_name)
 
         cv2.imshow('img', resized)
