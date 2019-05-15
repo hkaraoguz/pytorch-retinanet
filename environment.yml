@@ -86,5 +86,5 @@ dependencies:
     - pillow==6.0.0
     - pycocotools==2.0.0
     - torchvision==0.2.2.post3
-prefix: /home/hakan/development/miniconda3/envs/retinanet
+
 

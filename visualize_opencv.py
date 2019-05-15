@@ -71,7 +71,9 @@ def inference(cvimg, conf_thresh=0.5):
     results_dict = {}
     # cvimg = cv2.imread("data/val/shelves4.jpg",-1)
     try:
-        retinanet = torch.load("csv_retinanet_1200.pt")
+        home_path = os.getenv("HOME")
+        model_path = os.path.join(home_path,"Dev","pytorch_retinanet","model_final.pt")
+        retinanet = torch.load(model_path)
         retinanet = retinanet.cuda()
         retinanet.eval()
         # Transform image into right format
@@ -207,5 +209,5 @@ def main(args=None):
         cv2.imshow('img', resized)
         cv2.waitKey(0)
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#    main()
