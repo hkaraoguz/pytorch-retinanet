@@ -19,10 +19,30 @@ from dataloader import CocoDataset, CSVDataset, collater, \
     Resizer, AspectRatioBasedSampler, Augmenter, UnNormalizer, Normalizer
 
 import skimage
+import csv
 
 assert torch.__version__.split('.')[1] == '4'
 
 print('CUDA available: {}'.format(torch.cuda.is_available()))
+
+home_path = os.getenv("HOME")
+labels_path = os.path.join(home_path,"Dev","pytorch_retinanet","labels.csv")
+
+labels = {}
+with open(labels_path,"r") as f:
+    line = f.readline()
+    items = line.split(",")
+    labels[int(items[1])] = items[0]
+    while line :
+        line = f.readline()
+        items = line.split(",")
+        if(len(items) !=2):
+            break
+        
+        labels[int(items[1])] = items[0]
+
+
+print(labels)
 
 def normalize_image(img):
         
@@ -70,57 +90,59 @@ def inference(cvimg, conf_thresh=0.5):
     '''
     results_dict = {}
     # cvimg = cv2.imread("data/val/shelves4.jpg",-1)
-    try:
-        home_path = os.getenv("HOME")
-        model_path = os.path.join(home_path,"Dev","pytorch_retinanet","model_final.pt")
-        retinanet = torch.load(model_path)
-        retinanet = retinanet.cuda()
-        retinanet.eval()
-        # Transform image into right format
-        rgbcvimg = cv2.cvtColor(cvimg, cv2.COLOR_BGR2RGB)
-        ncvimg = normalize_image(rgbcvimg.astype(np.float32)/255.0)
-        rncvimg, pad_w, pad_h = resize_image(ncvimg)
-        print("pad_w {} pad_h {}".format(pad_w, pad_h))
-        #print(rncvimg.shape)
-        img = torch.from_numpy(rncvimg).cuda().float()
-        img = img[np.newaxis, :] 
-        #print(img.shape)
-        img = img.permute(0, 3, 1, 2)
+    #try:
+    home_path = os.getenv("HOME")
+    model_path = os.path.join(home_path,"Dev","pytorch_retinanet","model_final.pt")
+    retinanet = torch.load(model_path)
+    retinanet = retinanet.cuda()
+    retinanet.eval()
+    # Transform image into right format
+    #print(cvimg)
+    rgbcvimg = cv2.cvtColor(cvimg, cv2.COLOR_BGR2RGB)
+    #print("color")
+    ncvimg = normalize_image(rgbcvimg.astype(np.float32)/255.0)
+    rncvimg, pad_w, pad_h = resize_image(ncvimg)
+    print("pad_w {} pad_h {}".format(pad_w, pad_h))
+    #print(rncvimg.shape)
+    img = torch.from_numpy(rncvimg).cuda().float()
+    img = img[np.newaxis, :] 
+    #print(img.shape)
+    img = img.permute(0, 3, 1, 2)
 
-        with torch.no_grad():
-            st = time.time()
-            scores, classification, transformed_anchors = retinanet(img)
-            print('Elapsed time: {}'.format(time.time()-st))
-            idxs = np.where(scores > conf_thresh)
-            srcimg = cvimg.copy() 
+    with torch.no_grad():
+        st = time.time()
+        scores, classification, transformed_anchors = retinanet(img)
+        print('Elapsed time: {}'.format(time.time()-st))
+        idxs = np.where(scores > conf_thresh)
+        srcimg = cvimg.copy() 
 
-            dim = (rncvimg.shape[1]-pad_w, rncvimg.shape[0]-pad_h)
-            # resize image
-            resized = cv2.resize(srcimg, dim, interpolation=cv2.INTER_AREA)
-            
-            bboxes = []
-            for j in range(idxs[0].shape[0]):
-                bbox = transformed_anchors[idxs[0][j], :]
-                x1 = int(bbox[0])
-                y1 = int(bbox[1])
-                x2 = int(bbox[2])
-                y2 = int(bbox[3])
-                label_name = dataset_val.labels[int(classification[idxs[0][j]])]
-                draw_caption(resized, (x1, y1, x2, y2), label_name)
+        dim = (rncvimg.shape[1]-pad_w, rncvimg.shape[0]-pad_h)
+        # resize image
+        resized = cv2.resize(srcimg, dim, interpolation=cv2.INTER_AREA)
+        
+        bboxes = []
+        for j in range(idxs[0].shape[0]):
+            bbox = transformed_anchors[idxs[0][j], :]
+            x1 = int(bbox[0])
+            y1 = int(bbox[1])
+            x2 = int(bbox[2])
+            y2 = int(bbox[3])
+            label_name = labels[int(classification[idxs[0][j]])]
+            #draw_caption(resized, (x1, y1, x2, y2), label_name)
 
-                cv2.rectangle(resized, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
-                bboxes.append([x1, y1, x2, y2, label_name, scores[j].item()])
-                #print(label_name)
-            results_dict["status"] = "Success"
-            results_dict["result"] = bboxes
-    except Exception as ex:
-        print(ex)
-        results_dict["status"] = "Fail. {}".format(str(ex))
-        results_dict["results"] = []
+            cv2.rectangle(resized, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
+            bboxes.append([x1, y1, x2, y2, label_name, scores[j].item()])
+            #print(label_name)
+        #results_dict["status"] = "Success"
+        results_dict["result"] = bboxes
+    #except Exception as ex:
+    #    print(ex)
+    #    results_dict["status"] = "Fail. {}".format(str(ex))
+    #    results_dict["results"] = []
     
     torch.cuda.empty_cache()
     
-    return json.dumps(results_dict)
+    return bboxes
 
 
 def main(args=None):
