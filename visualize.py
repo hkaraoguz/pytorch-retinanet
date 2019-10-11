@@ -67,7 +67,7 @@ def main(args=None):
 			st = time.time()
 			scores, classification, transformed_anchors = retinanet(data['img'].cuda().float())
 			print('Elapsed time: {}'.format(time.time()-st))
-			idxs = np.where(scores>0.5)
+			idxs = np.where(scores>0.3)
 			img = np.array(255 * unnormalize(data['img'][0, :, :, :])).copy()
 
 			img[img<0] = 0
@@ -88,7 +88,7 @@ def main(args=None):
 
 				cv2.rectangle(img, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
 				print(label_name)
-
+			#img = cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_RGB2BGR)
 			cv2.imshow('img', img)
 			cv2.waitKey(0)
 

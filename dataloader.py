@@ -267,7 +267,7 @@ class CSVDataset(Dataset):
             # If a row contains only an image path, it's an image without annotations.
             if (x1, y1, x2, y2, class_name) == ('', '', '', '', ''):
                 continue
-
+            #print(x1,y1,x2,y2,class_name)
             x1 = self._parse(x1, int, 'line {}: malformed x1: {{}}'.format(line))
             y1 = self._parse(y1, int, 'line {}: malformed y1: {{}}'.format(line))
             x2 = self._parse(x2, int, 'line {}: malformed x2: {{}}'.format(line))
@@ -275,9 +275,13 @@ class CSVDataset(Dataset):
 
             # Check that the bounding box is valid.
             if x2 <= x1:
-                raise ValueError('line {}: x2 ({}) must be higher than x1 ({})'.format(line, x2, x1))
+                print('line {}: x2 ({}) must be higher than x1 ({})'.format(line, x2, x1))
+                continue
+                # raise ValueError('line {}: x2 ({}) must be higher than x1 ({})'.format(line, x2, x1))
             if y2 <= y1:
-                raise ValueError('line {}: y2 ({}) must be higher than y1 ({})'.format(line, y2, y1))
+                print('line {}: x2 ({}) must be higher than x1 ({})'.format(line, x2, x1))
+                continue
+                # raise ValueError('line {}: y2 ({}) must be higher than y1 ({})'.format(line, y2, y1))
 
             # check if the current class name is correctly present
             if class_name not in classes:

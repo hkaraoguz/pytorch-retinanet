@@ -24,6 +24,9 @@ from torch.utils.data import Dataset, DataLoader
 
 import coco_eval
 import csv_eval
+import sys
+
+from datetime import datetime
 
 assert torch.__version__.split('.')[1] == '4'
 
@@ -42,6 +45,7 @@ def main(args=None):
 
 	parser.add_argument('--depth', help='Resnet depth, must be one of 18, 34, 50, 101, 152', type=int, default=50)
 	parser.add_argument('--epochs', help='Number of epochs', type=int, default=100)
+	parser.add_argument('--snapshot_interval', help='Number of epochs', type=int, default=20)
 
 	parser = parser.parse_args(args)
 
@@ -73,7 +77,8 @@ def main(args=None):
 
 	else:
 		raise ValueError('Dataset type not understood (must be csv or coco), exiting.')
-
+	
+	# batch size is here
 	sampler = AspectRatioBasedSampler(dataset_train, batch_size=2, drop_last=False)
 	dataloader_train = DataLoader(dataset_train, num_workers=3, collate_fn=collater, batch_sampler=sampler)
 
@@ -104,7 +109,7 @@ def main(args=None):
 
 	retinanet.training = True
 
-	optimizer = optim.Adam(retinanet.parameters(), lr=1e-5)
+	optimizer = optim.Adam(retinanet.parameters(), lr=1e-3)
 
 	scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, verbose=True)
 
@@ -114,6 +119,15 @@ def main(args=None):
 	retinanet.module.freeze_bn()
 
 	print('Num training images: {}'.format(len(dataset_train)))
+
+	folder_name = "training_-{date:%Y-%m-%d_%H_%M_%S}".format(date=datetime.now())
+
+	try:
+		os.mkdir(folder_name)
+	except:
+		print("Cannot make training directory")
+		sys.exit(-1)
+		
 
 	for epoch_num in range(parser.epochs):
 
@@ -164,16 +178,19 @@ def main(args=None):
 
 			print('Evaluating dataset')
 
-			mAP = csv_eval.evaluate(dataset_val, retinanet)
+			mAP = csv_eval.evaluate(dataset_val, retinanet,max_detections=300)
 
 		
 		scheduler.step(np.mean(epoch_loss))	
-
-		torch.save(retinanet.module, '{}_retinanet_{}.pt'.format(parser.dataset, epoch_num))
+		if epoch_num > 0 and epoch_num % parser.snapshot_interval == 0:
+			model_name = '{}_retinanet_{}.pt'.format(parser.dataset, epoch_num)
+			model_path = os.path.join(folder_name,model_name)
+			torch.save(retinanet.module, model_path)
 
 	retinanet.eval()
-
-	torch.save(retinanet, 'model_final.pt'.format(epoch_num))
+	model_name = 'model_final.pt'
+	model_path = os.path.join(folder_name,model_name)
+	torch.save(retinanet, model_path)
 
 if __name__ == '__main__':
  main()

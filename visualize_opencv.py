@@ -116,21 +116,27 @@ def inference(cvimg, conf_thresh=0.5):
         idxs = np.where(scores > conf_thresh)
         srcimg = cvimg.copy() 
 
-        dim = (rncvimg.shape[1]-pad_w, rncvimg.shape[0]-pad_h)
+        ratio_y = float(rncvimg.shape[0]-pad_w)/srcimg.shape[0]
+        ratio_x = float(rncvimg.shape[1]-pad_h)/srcimg.shape[1]
+
+        ratio_y = 1./ratio_y
+        ratio_x = 1./ratio_x
+
+        #dim = (rncvimg.shape[1]-pad_w, rncvimg.shape[0]-pad_h)
         # resize image
-        resized = cv2.resize(srcimg, dim, interpolation=cv2.INTER_AREA)
+        #resized = cv2.resize(srcimg, dim, interpolation=cv2.INTER_AREA)
         
         bboxes = []
         for j in range(idxs[0].shape[0]):
             bbox = transformed_anchors[idxs[0][j], :]
-            x1 = int(bbox[0])
-            y1 = int(bbox[1])
-            x2 = int(bbox[2])
-            y2 = int(bbox[3])
+            x1 = int(bbox[0]*ratio_x)
+            y1 = int(bbox[1]*ratio_y)
+            x2 = int(bbox[2]*ratio_x)
+            y2 = int(bbox[3]*ratio_y)
             label_name = labels[int(classification[idxs[0][j]])]
             #draw_caption(resized, (x1, y1, x2, y2), label_name)
 
-            cv2.rectangle(resized, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
+            cv2.rectangle(srcimg, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
             bboxes.append([x1, y1, x2, y2, label_name, scores[j].item()])
             #print(label_name)
         #results_dict["status"] = "Success"
