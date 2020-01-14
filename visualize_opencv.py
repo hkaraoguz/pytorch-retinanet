@@ -7,6 +7,7 @@ import pdb
 import time
 import argparse
 import json
+import datetime
 
 import sys
 import cv2
@@ -27,6 +28,10 @@ print('CUDA available: {}'.format(torch.cuda.is_available()))
 
 home_path = os.getenv("HOME")
 labels_path = os.path.join(home_path,"Dev","pytorch_retinanet","labels.csv")
+
+saved_images_path = os.path.join(home_path,'detected_images')
+if not os.path.exists(saved_images_path):
+    os.mkdir(saved_images_path)
 
 labels = {}
 with open(labels_path,"r") as f:
@@ -138,6 +143,11 @@ def inference(cvimg, conf_thresh=0.5):
 
             cv2.rectangle(srcimg, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
             bboxes.append([x1, y1, x2, y2, label_name, scores[j].item()])
+        strtime=datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+        strtime +='.jpg'
+        filename = os.path.join(saved_images_path,strtime)
+        #print(filename)
+        cv2.imwrite(filename,srcimg)
             #print(label_name)
         #results_dict["status"] = "Success"
         results_dict["result"] = bboxes
