@@ -178,7 +178,7 @@ def main(args=None):
 
 			print('Evaluating dataset')
 
-			mAP = csv_eval.evaluate(dataset_val, retinanet,max_detections=300)
+			mAP = csv_eval.evaluate(dataset_val, retinanet,max_detections=1000)
 
 		
 		scheduler.step(np.mean(epoch_loss))	

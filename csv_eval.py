@@ -206,7 +206,9 @@ def evaluate(
                 else:
                     false_positives = np.append(false_positives, 1)
                     true_positives  = np.append(true_positives, 0)
-
+            #print('information')
+            #print(annotations.shape[0])
+            #print(len(detected_annotations))
         # no annotations -> AP for this class is 0 (is this correct?)
         if num_annotations == 0:
             average_precisions[label] = 0, 0
@@ -224,6 +226,9 @@ def evaluate(
         # compute recall and precision
         recall    = true_positives / num_annotations
         precision = true_positives / np.maximum(true_positives + false_positives, np.finfo(np.float64).eps)
+        
+        #for tp in true_positives:
+        #    print('%3.f'%tp)
 
         # compute average precision
         average_precision  = _compute_ap(recall, precision)
